@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}标签管理 - 初中数学错题本{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>标签管理</h1>
+
+    <!-- 新建标签 -->
+    <div class="tag-create-section">
+        <h2>新建标签</h2>
+        <form id="createTagForm" class="tag-form">
+            <input type="text" id="tagName" placeholder="标签名称" required>
+            <input type="color" id="tagColor" value="#0078D4">
+            <button type="submit" class="btn btn-primary">创建</button>
+        </form>
+    </div>
+
+    <!-- 标签列表 -->
+    <div class="tags-list-section">
+        <h2>所有标签</h2>
+        <div class="tags-grid">
+            {% for tag in tags %}
+            <div class="tag-card" data-tag-id="{{ tag.id }}">
+                <div class="tag-color-preview" style="background-color: {{ tag.color }};"></div>
+                <div class="tag-info">
+                    <div class="tag-name">{{ tag.name }}</div>
+                    <div class="tag-usage">使用次数: {{ tag.usage_count }}</div>
+                </div>
+                <div class="tag-actions">
+                    <button onclick="editTag({{ tag.id }}, '{{ tag.name }}', '{{ tag.color }}')" class="btn btn-secondary btn-sm">编辑</button>
+                    <button onclick="deleteTag({{ tag.id }}, {{ tag.usage_count }})" class="btn btn-danger btn-sm">删除</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not tags %}
+        <p class="empty-state">暂无标签</p>
+        {% endif %}
+    </div>
+
+    <!-- 编辑标签模态框 -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>编辑标签</h3>
+            <form id="editTagForm" class="tag-form">
+                <input type="hidden" id="editTagId">
+                <input type="text" id="editTagName" placeholder="标签名称" required>
+                <input type="color" id="editTagColor">
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" onclick="closeEditModal()" class="btn btn-secondary">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 创建标签
+document.getElementById('createTagForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('tagName').value.trim();
+    const color = document.getElementById('tagColor').value;
+
+    if (!name) {
+        showToast('请输入标签名称', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch('/tags', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, color: color})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('标签创建成功', 'success');
+            location.reload();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        showToast('操作失败: ' + error.message, 'error');
+    }
+});
+
+// 编辑标签
+function editTag(id, name, color) {
+    document.getElementById('editTagId').value = id;
+    document.getElementById('editTagName').value = name;
+    document.getElementById('editTagColor').value = color;
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+document.getElementById('editTagForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editTagId').value;
+    const name = document.getElementById('editTagName').value.trim();
+    const color = document.getElementById('editTagColor').value;
+
+    try {
+        const response = await fetch(`/tags/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name, color: color})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('标签更新成功', 'success');
+            location.reload();
+        } else {
+            showToast(result.message || '操作失败', 'error');
+        }
+    } catch (error) {
+        showToast('操作失败: ' + error.message, 'error');
+    }
+});
+
+// 删除标签
+async function deleteTag(id, count) {
+    if (count > 0) {
+        showToast(`无法删除：有 ${count} 道错题正在使用此标签`, 'error');
+        return;
+    }
+
+    if (!confirm('确定要删除这个标签吗？')) return;
+
+    try {
+        const response = await fetch(`/tags/${id}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('标签删除成功', 'success');
+            location.reload();
+        } else {
+            showToast(result.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        showToast('删除失败: ' + error.message, 'error');
+    }
+}
+
+// 点击模态框外部关闭
+document.getElementById('editModal').addEventListener('click', (e) => {
+    if (e.target.id === 'editModal') {
+        closeEditModal();
+    }
+});
+</script>
+
+<style>
+.tag-create-section {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.tag-form {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.tag-form input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tag-form input[type="color"] {
+    width: 60px;
+    height: 40px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.tags-list-section {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tags-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.tag-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+
+.tag-color-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.tag-info {
+    flex: 1;
+}
+
+.tag-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.tag-usage {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.tag-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    min-width: 400px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    color: #666;
+    padding: 2rem;
+}
+</style>
+{% endblock %}

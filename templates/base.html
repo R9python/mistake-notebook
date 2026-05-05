@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}初中数学错题本{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <svg class="logo-avatar" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="36" height="36">
+                    <!-- 脸 -->
+                    <circle cx="32" cy="34" r="18" fill="#FDDBB4"/>
+                    <!-- 头发 -->
+                    <ellipse cx="32" cy="20" rx="18" ry="12" fill="#4A2C0A"/>
+                    <ellipse cx="16" cy="30" rx="5" ry="10" fill="#4A2C0A"/>
+                    <ellipse cx="48" cy="30" rx="5" ry="10" fill="#4A2C0A"/>
+                    <!-- 刘海 -->
+                    <ellipse cx="24" cy="22" rx="7" ry="5" fill="#4A2C0A"/>
+                    <ellipse cx="40" cy="22" rx="7" ry="5" fill="#4A2C0A"/>
+                    <!-- 发夹 -->
+                    <rect x="43" y="18" width="8" height="4" rx="2" fill="#FF6B9D"/>
+                    <circle cx="47" cy="20" r="2" fill="#FFD700"/>
+                    <!-- 眼睛 -->
+                    <ellipse cx="25" cy="34" rx="3.5" ry="4" fill="#fff"/>
+                    <ellipse cx="39" cy="34" rx="3.5" ry="4" fill="#fff"/>
+                    <circle cx="25" cy="35" r="2" fill="#3A2010"/>
+                    <circle cx="39" cy="35" r="2" fill="#3A2010"/>
+                    <circle cx="26" cy="34" r="0.7" fill="#fff"/>
+                    <circle cx="40" cy="34" r="0.7" fill="#fff"/>
+                    <!-- 腮红 -->
+                    <ellipse cx="20" cy="40" rx="4" ry="2.5" fill="#FFB3C1" opacity="0.6"/>
+                    <ellipse cx="44" cy="40" rx="4" ry="2.5" fill="#FFB3C1" opacity="0.6"/>
+                    <!-- 嘴 -->
+                    <path d="M27 43 Q32 47 37 43" stroke="#E07070" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                </svg>
+                📚 数学错题本<span class="logo-owner">（张岸雨专属）</span>
+            </a>
+            <ul class="nav-menu">
+                <li><a href="/" class="{{ 'active' if request.path == '/' else '' }}">首页</a></li>
+                <li><a href="/mistakes" class="{{ 'active' if request.path.startswith('/mistakes') or request.path.startswith('/upload') else '' }}">错题集</a></li>
+                <li><a href="/classics" class="{{ 'active' if request.path.startswith('/classics') else '' }}">经典题库</a></li>
+                <li><a href="/analysis" class="{{ 'active' if request.path.startswith('/analysis') else '' }}">分析报告</a></li>
+                <li><a href="/tags" class="{{ 'active' if request.path.startswith('/tags') else '' }}">标签管理</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 初中数学错题本 - 家庭私有版</p>
+        </div>
+    </footer>
+
+    <!-- Toast 通知容器 -->
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

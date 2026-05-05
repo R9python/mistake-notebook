@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(chmod +x:*)",
+      "Bash(grep:*)",
+      "Bash(find .:*)",
+      "Bash(/home/zhy/mycode/mistake-notebook/NEXT_STEPS.md:*)",
+      "Bash(ls:*)",
+      "Bash(pip install:*)",
+      "Bash(sudo apt:*)",
+      "Bash(pkill:*)",
+      "Bash(sudo:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 120 /tmp/monitor_logs.sh:*)",
+      "Bash(sqlite3 data/mistakes.db \"SELECT id, substr\\(question_text, 1, 300\\) FROM mistakes LIMIT 3;\")",
+      "Bash(sqlite3 instance/mistakes.db \"\nALTER TABLE knowledge_points ADD COLUMN semester INTEGER;\nALTER TABLE knowledge_points ADD COLUMN chapter VARCHAR\\(50\\);\n\" && echo \"done\")",
+      "Read(//home/zhy/.claude/**)",
+      "Bash(sed -i \"s/alert\\('请选择图片文件'\\);/showToast\\('请选择图片文件', 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('请选择年级'\\);/showToast\\('请选择年级', 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('请选择图片'\\);/showToast\\('请选择图片', 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('上传失败: ' + \\(result\\\\.error || '未知错误'\\)\\);/showToast\\('上传失败: ' + \\(result.error || '未知错误'\\), 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('上传失败: ' + error\\\\.message\\);/showToast\\('上传失败: ' + error.message, 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('批量上传失败: ' + \\(result\\\\.error || '未知错误'\\)\\);/showToast\\('批量上传失败: ' + \\(result.error || '未知错误'\\), 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(sed -i \"s/alert\\('批量上传失败: ' + error\\\\.message\\);/showToast\\('批量上传失败: ' + error.message, 'error'\\);/g\" upload.html classic_upload.html)",
+      "Bash(git add *)"
+    ]
+  }
+}

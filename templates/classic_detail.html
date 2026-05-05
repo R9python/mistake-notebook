@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}经典题详情 - 初中数学错题本{% endblock %}
+
+{% block extra_head %}
+<!-- MathJax config must be defined BEFORE loading the library -->
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  startup: {
+    typeset: false,
+    ready: function() {
+      MathJax.startup.defaultReady();
+      MathJax.startup.promise.then(function() {
+        if (typeof updateQuestionPreview === 'function') {
+          updateQuestionPreview();
+        }
+        var el = document.getElementById('explanationContent');
+        if (el) MathJax.typesetPromise([el]);
+      });
+    }
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="detail-header">
+        <div class="detail-nav">
+            {% if prev_classic %}
+            <a href="{{ url_for('classics.classic_detail', classic_id=prev_classic.id) }}" class="btn btn-secondary btn-sm detail-nav-btn" title="上一题 #{{ prev_classic.id }}">&#8592; 上一题</a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm detail-nav-btn detail-nav-disabled">&#8592; 上一题</span>
+            {% endif %}
+            <span class="detail-nav-pos">经典题详情 第 {{ classic.id }} 题</span>
+            {% if next_classic %}
+            <a href="{{ url_for('classics.classic_detail', classic_id=next_classic.id) }}" class="btn btn-secondary btn-sm detail-nav-btn" title="下一题 #{{ next_classic.id }}">下一题 &#8594;</a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm detail-nav-btn detail-nav-disabled">下一题 &#8594;</span>
+            {% endif %}
+        </div>
+        <div class="detail-actions">
+            <button onclick="toggleMastered()" class="btn btn-primary" id="masterBtn">
+                {% if classic.is_mastered %}取消掌握{% else %}标记已掌握{% endif %}
+            </button>
+            <button onclick="recordReview()" class="btn btn-review">记录复习</button>
+            <button onclick="deleteClassic()" class="btn btn-danger">删除</button>
+        </div>
+    </div>
+
+    <div class="detail-content">
+        <!-- 图片 -->
+        <div class="detail-image">
+            <img src="{{ url_for('static', filename=classic.image_path) }}" alt="经典题原图">
+        </div>
+
+        <!-- 经典题标签 -->
+        <div class="detail-info">
+            <div class="info-section">
+                <h3>经典题标签</h3>
+                <div id="tagSelector"></div>
+                <button onclick="saveTags()" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">保存标签</button>
+            </div>
+        </div>
+
+        <!-- 信息 -->
+        <div class="detail-info">
+            <div class="info-section info-meta">
+                <h3>基本信息</h3>
+                <p><strong>年级：</strong>
+                    {% if classic.grade_level == 7 %}初一
+                    {% elif classic.grade_level == 8 %}初二
+                    {% elif classic.grade_level == 9 %}初三
+                    {% else %}未知{% endif %}
+                </p>
+                <p><strong>学期：</strong>
+                    {% if classic.knowledge_point and classic.knowledge_point.semester == 1 %}上学期
+                    {% elif classic.knowledge_point and classic.knowledge_point.semester == 2 %}下学期
+                    {% else %}未知{% endif %}
+                </p>
+                {% if classic.knowledge_point and classic.knowledge_point.chapter %}
+                <p><strong>章节：</strong>{{ classic.knowledge_point.chapter }}</p>
+                {% endif %}
+                <p><strong>课本目录：</strong>{{ classic.knowledge_point.category if classic.knowledge_point else '未分类' }}</p>
+                {% if classic.knowledge_point and classic.knowledge_point.description %}
+                <p><strong>知识内容：</strong>{{ classic.knowledge_point.description }}</p>
+                {% endif %}
+                <p><strong>创建时间：</strong>{{ classic.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                <p><strong>复习次数：</strong>{{ classic.review_count }} 次</p>
+                {% if classic.last_review_at %}
+                <p><strong>最后复习：</strong>{{ classic.last_review_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                {% endif %}
+            </div>
+
+            <div class="info-section">
+                <h3>题目内容</h3>
+                <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:1rem;">
+                    <span class="knowledge-tag">{{ classic.knowledge_point.name if classic.knowledge_point else '未分类' }}</span>
+                    <span class="difficulty-tag difficulty-{{ classic.difficulty }}">
+                        {% if classic.difficulty == 'easy' %}简单
+                        {% elif classic.difficulty == 'hard' %}困难
+                        {% else %}中等
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="question-edit-wrapper">
+                    <div class="question-edit-area">
+                        <label class="question-label">原题编辑</label>
+                        <textarea id="questionText" class="question-text-edit">{{ classic.question_text }}</textarea>
+                        <button onclick="saveQuestion()" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">保存修改</button>
+                    </div>
+                    <div class="question-preview-area">
+                        <label class="question-label">题目预览</label>
+                        <div class="question-text-preview" id="questionPreview"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- AI解析 -->
+    <div class="explanation-section">
+        <h2>
+            AI解析
+            {% if not classic.ai_explanation %}
+            <button onclick="generateExplanation(false)" class="btn btn-primary btn-sm" id="genExplanationBtn">
+                生成解析
+            </button>
+            {% else %}
+            <button onclick="generateExplanation(true)" class="btn btn-secondary btn-sm" id="genExplanationBtn">
+                重新生成
+            </button>
+            {% endif %}
+        </h2>
+        <div id="explanationContent" class="explanation-content">
+            {% if classic.ai_explanation %}
+            {{ classic.ai_explanation|safe }}
+            {% else %}
+            <p class="placeholder">点击"生成解析"按钮获取AI详细解析</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 笔记 -->
+    <div class="notes-section">
+        <h2>点妹的笔记</h2>
+        <textarea id="notesText" rows="5" placeholder="添加你的笔记...">{{ classic.notes or '' }}</textarea>
+        <button onclick="saveNotes()" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">保存笔记</button>
+    </div>
+
+    <!-- 底部导航 -->
+    <div class="detail-header" style="margin-top:2rem;">
+        <div class="detail-nav">
+            {% if prev_classic %}
+            <a href="{{ url_for('classics.classic_detail', classic_id=prev_classic.id) }}" class="btn btn-secondary btn-sm detail-nav-btn" title="上一题 #{{ prev_classic.id }}">&#8592; 上一题</a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm detail-nav-btn detail-nav-disabled">&#8592; 上一题</span>
+            {% endif %}
+            {% if next_classic %}
+            <a href="{{ url_for('classics.classic_detail', classic_id=next_classic.id) }}" class="btn btn-secondary btn-sm detail-nav-btn" title="下一题 #{{ next_classic.id }}">下一题 &#8594;</a>
+            {% else %}
+            <span class="btn btn-secondary btn-sm detail-nav-btn detail-nav-disabled">下一题 &#8594;</span>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classicId = {{ classic.id }};
+let isMastered = {{ 'true' if classic.is_mastered else 'false' }};
+let tagSelector = null;
+
+// 初始化标签选择器
+document.addEventListener('DOMContentLoaded', () => {
+    tagSelector = new TagSelector('tagSelector', {
+        placeholder: '选择或输入标签（如：找规律、三角形全等、动点问题）',
+        maxTags: 5,
+        allowCreate: true
+    });
+
+    // 等待标签选择器初始化完成后设置当前经典题的标签
+    setTimeout(() => {
+        const currentTags = {{ classic.tags | map(attribute='id') | list | tojson }};
+        if (tagSelector && currentTags.length > 0) {
+            tagSelector.setSelectedTags(currentTags);
+        }
+    }, 100);
+});
+
+async function toggleMastered() {
+    try {
+        const response = await fetch(`/classics/${classicId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({is_mastered: !isMastered})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            isMastered = !isMastered;
+            document.getElementById('masterBtn').textContent = isMastered ? '取消掌握' : '标记已掌握';
+        } else {
+            showToast('操作失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('操作失败: ' + error.message, 'error');
+    }
+}
+
+async function recordReview() {
+    try {
+        const response = await fetch(`/classics/${classicId}/review`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('复习记录已保存', 'success');
+            location.reload();
+        } else {
+            showToast('操作失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('操作失败: ' + error.message, 'error');
+    }
+}
+
+async function deleteClassic() {
+    if (!confirm('确定要删除这道经典题吗？此操作不可恢复！')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/classics/${classicId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('删除成功', 'success');
+            setTimeout(() => { window.location.href = '/classics'; }, 1000);
+        } else {
+            showToast('删除失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('删除失败: ' + error.message, 'error');
+    }
+}
+
+/**
+ * 将题目原文预处理为 MathJax 可渲染的内容
+ * 如果文本已有 $ 包裹则直接使用；
+ * 如果含有 LaTeX 命令但没有 $ 包裹，则按行自动补上 $...$
+ */
+function prepareForMathJax(text) {
+    // 将中文填空横线（连续下划线）替换为 LaTeX 下划线，避免被误解析为下标
+    text = text.replace(/_{2,}/g, '\\underline{\\qquad}');
+
+    // 已包含 $ 分隔符，直接使用
+    if (text.indexOf('$') !== -1) {
+        return text;
+    }
+
+    // 检测是否含有 LaTeX 命令：\frac \times \left 等，或 ^ _ （幂/下标）
+    var hasLatex = /\\[a-zA-Z]/.test(text) || /[\^_]/.test(text);
+    if (!hasLatex) {
+        return text;
+    }
+
+    // 按行处理：含 LaTeX 语法的行用 $ 包裹，纯文字行保持原样
+    var lines = text.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+        if (!/\\[a-zA-Z]/.test(line) && !/[\^_]/.test(line)) continue;
+
+        // 如果有中文前缀（如"计算："），只包裹冒号后面的公式部分
+        var m = line.match(/^([一-鿿＀-￯\s]*[：:]\s*)([\s\S]+)/);
+        if (m) {
+            lines[i] = m[1] + '$' + m[2] + '$';
+        } else {
+            lines[i] = '$' + line + '$';
+        }
+    }
+    return lines.join('\n');
+}
+
+function updateQuestionPreview() {
+    var raw = document.getElementById('questionText').value;
+    var preview = document.getElementById('questionPreview');
+    var prepared = prepareForMathJax(raw);
+
+    // 构建 HTML：转义 < > &，保留 $ 给 MathJax，换行转 <br>
+    var html = '';
+    for (var i = 0; i < prepared.length; i++) {
+        var ch = prepared[i];
+        if (ch === '&') html += '&amp;';
+        else if (ch === '<') html += '&lt;';
+        else if (ch === '>') html += '&gt;';
+        else if (ch === '\n') html += '<br>';
+        else html += ch;
+    }
+    preview.innerHTML = html;
+
+    if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetClear([preview]);
+        MathJax.typesetPromise([preview]);
+    }
+}
+
+// 监听编辑区输入，实时联动预览
+function autoResizeTextarea(el) {
+    el.style.height = '0';
+    el.style.height = el.scrollHeight + 'px';
+}
+
+const questionTextEl = document.getElementById('questionText');
+questionTextEl.addEventListener('input', function() {
+    autoResizeTextarea(this);
+    updateQuestionPreview();
+});
+// 页面 DOM 就绪后立即按内容撑高输入框
+document.addEventListener('DOMContentLoaded', function() {
+    autoResizeTextarea(questionTextEl);
+});
+
+async function saveQuestion() {
+    const questionText = document.getElementById('questionText').value;
+
+    try {
+        const response = await fetch(`/classics/${classicId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question_text: questionText})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            updateQuestionPreview();
+            showToast('保存成功');
+        } else {
+            showToast('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('保存失败: ' + error.message, 'error');
+    }
+}
+
+async function saveNotes() {
+    const notes = document.getElementById('notesText').value;
+
+    try {
+        const response = await fetch(`/classics/${classicId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({notes: notes})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('笔记保存成功');
+        } else {
+            showToast('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('保存失败: ' + error.message, 'error');
+    }
+}
+
+async function saveTags() {
+    if (!tagSelector) {
+        showToast('标签选择器未初始化', 'error');
+        return;
+    }
+
+    const tagIds = tagSelector.getSelectedTags();
+
+    try {
+        const response = await fetch(`/classics/${classicId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({tag_ids: tagIds})
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showToast('标签保存成功');
+            // 刷新页面以显示更新后的标签
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('保存失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('保存失败: ' + error.message, 'error');
+    }
+}
+
+async function generateExplanation(regenerate) {
+    var btn = document.getElementById('genExplanationBtn');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    document.getElementById('explanationContent').innerHTML =
+        '<div class="loading-spinner"><span class="spinner"></span> AI 解析生成中，通常需要 10~30 秒，请耐心等候...</div>';
+
+    try {
+        var response = await fetch('/classics/' + classicId + '/explanation', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({regenerate: regenerate})
+        });
+
+        var result = await response.json();
+        if (result.success) {
+            document.getElementById('explanationContent').innerHTML = result.explanation;
+            if (window.MathJax && MathJax.typesetPromise) {
+                MathJax.typesetPromise([document.getElementById('explanationContent')]);
+            }
+            btn.disabled = false;
+            btn.textContent = '重新生成';
+            btn.className = 'btn btn-secondary btn-sm';
+            btn.onclick = function() { generateExplanation(true); };
+        } else {
+            showToast('生成失败: ' + result.error, 'error');
+            btn.disabled = false;
+            btn.textContent = '生成解析';
+        }
+    } catch (error) {
+        showToast('生成失败: ' + error.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '生成解析';
+    }
+}
+</script>
+{% endblock %}

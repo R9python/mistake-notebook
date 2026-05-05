@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}分析报告 - 初中数学错题本{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+<style>
+.analysis-text {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin: 1rem 0;
+}
+
+.analysis-text h2 {
+    color: #0078D4;
+    font-size: 1.5rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #0078D4;
+}
+
+.analysis-text h3 {
+    color: #107C10;
+    font-size: 1.25rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.analysis-text p {
+    line-height: 1.8;
+    margin-bottom: 1rem;
+    color: #323130;
+}
+
+.analysis-text ul, .analysis-text ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.analysis-text li {
+    line-height: 1.8;
+    margin-bottom: 0.5rem;
+}
+
+.analysis-text strong {
+    color: #0078D4;
+    font-weight: 600;
+}
+
+.analysis-text code {
+    background: #F3F2F1;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+}
+
+.weak-point-bar {
+    background: #fff;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.weak-point-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #323130;
+}
+
+.priority-badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.priority-high {
+    background: #F25022;
+    color: white;
+}
+
+.priority-medium {
+    background: #FFB900;
+    color: white;
+}
+
+.priority-low {
+    background: #107C10;
+    color: white;
+}
+
+.weak-point-cause {
+    font-size: 0.9rem;
+    color: #605E5C;
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+
+.weak-point-progress {
+    background: #F3F2F1;
+    height: 24px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #0078D4, #00BCF2);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.weak-point-rate {
+    text-align: right;
+    font-weight: 600;
+    color: #0078D4;
+}
+
+.suggestion-group {
+    background: #fff;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #0078D4;
+}
+
+.suggestion-group h3 {
+    color: #0078D4;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.suggestion-group ul {
+    list-style: none;
+    padding: 0;
+}
+
+.suggestion-group li {
+    padding: 0.5rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+    line-height: 1.6;
+}
+
+.suggestion-group li:before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #107C10;
+    font-weight: bold;
+}
+
+.suggestion-item {
+    background: #fff;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.suggestion-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>学习分析报告</h1>
+
+    <!-- 生成新报告 -->
+    <div class="generate-section">
+        <select id="gradeFilter">
+            <option value="">全部年级</option>
+            <option value="7">初一</option>
+            <option value="8">初二</option>
+            <option value="9">初三</option>
+        </select>
+        <button onclick="generateReport()" class="btn btn-primary" id="generateBtn">
+            生成分析报告
+        </button>
+    </div>
+
+    <!-- 分析结果显示区域 -->
+    <div id="analysisResult" class="analysis-section" style="display: none;">
+        <h2>分析结果</h2>
+        <div id="weakTagsChart" class="chart-container"></div>
+        <div id="analysisText" class="analysis-text"></div>
+        <div id="suggestions" class="suggestions-list"></div>
+    </div>
+
+    <!-- 历史报告 -->
+    <div class="history-section">
+        <h2>历史报告</h2>
+        <div class="reports-list">
+            {% for report in reports %}
+            <div class="report-item">
+                <div class="report-date">{{ report.report_date.strftime('%Y-%m-%d') }}</div>
+                <div class="report-info">
+                    <p>总错题数: {{ report.total_mistakes }}</p>
+                    <button onclick="viewReport({{ report.id }})" class="btn btn-secondary btn-sm">
+                        查看详情
+                    </button>
+                    <button onclick="deleteReport({{ report.id }}, this)" class="btn btn-danger btn-sm">
+                        删除
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function generateReport() {
+    const btn = document.getElementById('generateBtn');
+    const gradeLevel = document.getElementById('gradeFilter').value;
+
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+
+    try {
+        const response = await fetch('/analysis/generate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({grade_level: gradeLevel ? parseInt(gradeLevel) : null})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayAnalysis(result);
+            showToast('分析报告生成成功', 'success');
+            // 刷新页面以显示新的历史报告
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('生成失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('生成失败: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '生成分析报告';
+    }
+}
+
+function displayAnalysis(result) {
+    // 显示分析结果区域
+    document.getElementById('analysisResult').style.display = 'block';
+
+    // 显示薄弱标签（支持新格式和旧格式）
+    const weakTags = result.weak_tags || result.weak_points || [];
+    const weakTagsHtml = weakTags.map(wt => {
+        const tagName = wt.tag || wt.knowledge_point;
+        const errorRate = wt.error_rate || 0;
+        const priority = wt.priority || 'medium';
+        const rootCause = wt.root_cause || wt.specific_issues || '';
+
+        return `
+            <div class="weak-point-bar">
+                <div class="weak-point-label">
+                    ${tagName}
+                    <span class="priority-badge priority-${priority}">${priority === 'high' ? '高' : priority === 'medium' ? '中' : '低'}</span>
+                </div>
+                ${rootCause ? `<div class="weak-point-cause">${rootCause}</div>` : ''}
+                <div class="weak-point-progress">
+                    <div class="progress-fill" style="width: ${errorRate * 100}%"></div>
+                </div>
+                <div class="weak-point-rate">${(errorRate * 100).toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('weakTagsChart').innerHTML = weakTagsHtml;
+
+    // 显示分析文本（使用 marked 解析 markdown）
+    const analysisMarkdown = result.analysis || '';
+    const analysisHtml = marked.parse(analysisMarkdown);
+    document.getElementById('analysisText').innerHTML = analysisHtml;
+
+    // 显示建议（支持新格式和旧格式）
+    const suggestions = result.suggestions || [];
+    let suggestionsHtml = '';
+
+    if (suggestions.length > 0 && typeof suggestions[0] === 'object') {
+        // 新格式：分类建议
+        suggestionsHtml = suggestions.map(s => `
+            <div class="suggestion-group">
+                <h3>${s.title}</h3>
+                <ul>
+                    ${s.actions.map(action => `<li>${action}</li>`).join('')}
+                </ul>
+            </div>
+        `).join('');
+    } else {
+        // 旧格式：简单列表
+        suggestionsHtml = suggestions.map(s => `
+            <div class="suggestion-item">
+                <span class="suggestion-icon">💡</span>
+                <span>${s}</span>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('suggestions').innerHTML = suggestionsHtml;
+}
+
+async function deleteReport(reportId, btn) {
+    if (!confirm('确定要删除这条历史报告吗？')) return;
+    try {
+        const response = await fetch(`/analysis/${reportId}`, {method: 'DELETE'});
+        const result = await response.json();
+        if (result.success) {
+            btn.closest('.report-item').remove();
+            showToast('删除成功', 'success');
+        } else {
+            showToast('删除失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('删除失败: ' + error.message, 'error');
+    }
+}
+
+async function viewReport(reportId) {
+    try {
+        const response = await fetch(`/analysis/${reportId}`);
+        const result = await response.json();
+
+        if (result.success) {
+            displayAnalysis({
+                weak_tags: result.report.weak_points,
+                analysis: result.report.analysis,
+                suggestions: []
+            });
+        } else {
+            showToast('加载失败', 'error');
+        }
+    } catch (error) {
+        showToast('加载失败: ' + error.message, 'error');
+    }
+}
+</script>
+{% endblock %}

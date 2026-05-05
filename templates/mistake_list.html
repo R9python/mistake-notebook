@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}错题集 - 初中数学错题本{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1>错题集</h1>
+        <a href="/upload" class="btn btn-primary">+ 上传错题</a>
+    </div>
+
+    <!-- 筛选区域 -->
+    <div class="filter-section">
+        <form method="get" action="/mistakes" class="filter-form">
+            <select name="grade" id="gradeFilter">
+                <option value="">全部年级</option>
+                <option value="7" {% if request.args.get('grade') == '7' %}selected{% endif %}>初一</option>
+                <option value="8" {% if request.args.get('grade') == '8' %}selected{% endif %}>初二</option>
+                <option value="9" {% if request.args.get('grade') == '9' %}selected{% endif %}>初三</option>
+            </select>
+
+            <select name="semester" id="semesterFilter">
+                <option value="">全部学期</option>
+                <option value="1" {% if request.args.get('semester') == '1' %}selected{% endif %}>上学期</option>
+                <option value="2" {% if request.args.get('semester') == '2' %}selected{% endif %}>下学期</option>
+            </select>
+
+            <select name="knowledge_point" id="knowledgePointFilter">
+                <option value="">全部知识点</option>
+                {% for kp in knowledge_points %}
+                <option value="{{ kp.id }}" {% if request.args.get('knowledge_point') == kp.id|string %}selected{% endif %}>
+                    {{ kp.name }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <select name="mastered" id="masteredFilter">
+                <option value="">全部状态</option>
+                <option value="0" {% if request.args.get('mastered') == '0' %}selected{% endif %}>未掌握</option>
+                <option value="1" {% if request.args.get('mastered') == '1' %}selected{% endif %}>已掌握</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary">筛选</button>
+            <a href="/mistakes" class="btn btn-secondary">重置</a>
+        </form>
+    </div>
+
+    <!-- 标签快速筛选 -->
+    {% if tags %}
+    <div class="tag-filter-bar">
+        <span style="font-weight: 600; margin-right: 0.5rem;">快速筛选：</span>
+        {% for tag in tags %}
+        <a href="/mistakes?tag={{ tag.id }}"
+           class="tag-filter-item {% if request.args.get('tag') == tag.id|string %}active{% endif %}"
+           style="background-color: {{ tag.color }};">
+            {{ tag.name }}
+        </a>
+        {% endfor %}
+        {% if request.args.get('tag') %}
+        <a href="/mistakes" class="btn btn-secondary btn-sm">清除标签筛选</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 批量操作 -->
+    <div class="batch-actions">
+        <button onclick="batchMaster()" class="btn btn-secondary btn-sm">批量标记掌握</button>
+        <button onclick="batchDelete()" class="btn btn-danger btn-sm">批量删除</button>
+    </div>
+
+    <!-- 错题列表 -->
+    <div class="mistakes-grid">
+        {% for mistake in mistakes %}
+        <div class="mistake-card">
+            <input type="checkbox" class="mistake-checkbox" value="{{ mistake.id }}">
+            <span class="mistake-seq">{{ mistake.id }}</span>
+            {% if mistake.is_mastered %}
+            <span class="mastered-badge">✓</span>
+            {% endif %}
+            <a href="/mistakes/{{ mistake.id }}">
+                <img src="{{ url_for('static', filename=mistake.thumbnail_path) }}"
+                     alt="错题缩略图" class="mistake-thumbnail">
+                <div class="mistake-info">
+                    <span class="knowledge-tag">{{ mistake.knowledge_point.name if mistake.knowledge_point else '未分类' }}</span>
+                    <div class="mistake-tags">
+                        {% for tag in mistake.tags[:3] %}
+                        <span class="tag-item" style="background-color: {{ tag.color }};">{{ tag.name }}</span>
+                        {% endfor %}
+                        {% if mistake.tags|length > 3 %}
+                        <span class="tag-item">+{{ mistake.tags|length - 3 }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="mistake-date">{{ mistake.created_at.strftime('%Y-%m-%d') }}</div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not mistakes %}
+    <div class="empty-state">
+        <p>暂无错题</p>
+        <a href="/upload" class="btn btn-primary">上传第一道错题</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getSelectedIds() {
+    const checkboxes = document.querySelectorAll('.mistake-checkbox:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+}
+
+async function batchMaster() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) { showToast('请先选择错题', 'error'); return; }
+    if (!confirm(`确定要标记 ${ids.length} 道错题为已掌握吗？`)) return;
+
+    try {
+        const response = await fetch('/mistakes/batch-master', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mistake_ids: ids})
+        });
+        const result = await response.json();
+        if (result.success) { showToast(result.message, 'success'); location.reload(); }
+        else showToast('操作失败: ' + result.error, 'error');
+    } catch (error) { showToast('操作失败: ' + error.message, 'error'); }
+}
+
+async function batchDelete() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) { showToast('请先选择经典题', 'error'); return; }
+    if (!confirm(`确定要删除 ${ids.length} 道错题吗？此操作不可恢复！`)) return;
+
+    try {
+        const response = await fetch('/mistakes/batch-delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mistake_ids: ids})
+        });
+        const result = await response.json();
+        if (result.success) { showToast(result.message, 'success'); location.reload(); }
+        else showToast('删除失败: ' + result.error, 'error');
+    } catch (error) { showToast('删除失败: ' + error.message, 'error'); }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}上传经典题 - 初中数学错题本{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>上传经典题</h1>
+
+    <div class="upload-section">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <!-- 年级、学期、章节选择（同一行） -->
+            <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+                <div class="form-group" style="margin:0;">
+                    <label for="gradeLevel">选择年级：</label>
+                    <select id="gradeLevel" name="grade_level" required>
+                        <option value="">请选择</option>
+                        <option value="7" selected>初一</option>
+                        <option value="8">初二</option>
+                        <option value="9">初三</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="semesterGroup" style="margin:0;">
+                    <label for="semesterSelect">选择学期：</label>
+                    <select id="semesterSelect">
+                        <option value="">请选择</option>
+                        <option value="1">上学期</option>
+                        <option value="2">下学期</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="chapterGroup" style="margin:0; display:none;">
+                    <label for="chapterSelect">选择章节：</label>
+                    <select id="chapterSelect" name="knowledge_point_id">
+                        <option value="">请选择</option>
+                    </select>
+                </div>
+            </div>
+            <p id="chapterDesc" style="margin-top:6px; color:#605E5C; font-size:0.85em;"></p>
+
+            <!-- 经典题标签 -->
+            <div class="form-group" style="margin-top:12px;">
+                <label for="tagSelector">经典题标签（选填）：</label>
+                <div id="tagSelector"></div>
+            </div>
+
+            <!-- 拖拽上传区域 -->
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📷</div>
+                <p>拖拽图片到这里，或点击选择文件</p>
+                <p class="upload-hint">支持 JPG、PNG、WebP 格式，最大 5MB</p>
+                <input type="file" id="fileInput" name="file" accept="image/*" multiple style="display: none;">
+            </div>
+
+            <!-- 预览区域 -->
+            <div id="previewArea" class="preview-area" style="display: none;"></div>
+
+            <!-- 上传按钮 -->
+            <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                开始上传并识别
+            </button>
+        </form>
+
+        <!-- 进度显示 -->
+        <div id="progressArea" class="progress-area" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p id="progressText">处理中...</p>
+        </div>
+
+        <!-- 结果显示 -->
+        <div id="resultArea" class="result-area" style="display: none;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const uploadForm = document.getElementById('uploadForm');
+const previewArea = document.getElementById('previewArea');
+const uploadBtn = document.getElementById('uploadBtn');
+const progressArea = document.getElementById('progressArea');
+const resultArea = document.getElementById('resultArea');
+const gradeLevel = document.getElementById('gradeLevel');
+const semesterSelect = document.getElementById('semesterSelect');
+const chapterSelect = document.getElementById('chapterSelect');
+
+// 后端传入的知识点数据
+const kpData = {{ kp_data | tojson }};
+
+let selectedFiles = [];
+let tagSelector = null;
+
+// 初始化标签选择器
+document.addEventListener('DOMContentLoaded', () => {
+    tagSelector = new TagSelector('tagSelector', {
+        placeholder: '选择或输入标签（如：找规律、三角形全等、动点问题）',
+        maxTags: 5,
+        allowCreate: true
+    });
+});
+
+// 初始化：默认初一时显示学期选择
+document.getElementById('semesterGroup').style.display = 'block';
+
+// 章节变化 -> 显示描述
+chapterSelect.addEventListener('change', () => {
+    const opt = chapterSelect.options[chapterSelect.selectedIndex];
+    const desc = opt ? opt.dataset.desc : '';
+    document.getElementById('chapterDesc').textContent = desc;
+});
+gradeLevel.addEventListener('change', () => {
+    const g = parseInt(gradeLevel.value);
+    semesterSelect.value = '';
+    chapterSelect.innerHTML = '<option value="">请选择</option>';
+    document.getElementById('semesterGroup').style.display = g ? 'block' : 'none';
+    document.getElementById('chapterGroup').style.display = 'none';
+});
+
+// 学期变化 -> 填充章节
+semesterSelect.addEventListener('change', () => {
+    const g = parseInt(gradeLevel.value);
+    const s = parseInt(semesterSelect.value);
+    chapterSelect.innerHTML = '<option value="">请选择</option>';
+    if (g && s && kpData[g] && kpData[g][s]) {
+        const sorted = kpData[g][s].slice().sort((a, b) => {
+            const cnMap = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+            const chapterNum = x => {
+                const m = (x.chapter || '').match(/第([一二三四五六七八九十]+)章/);
+                if (!m) return 0;
+                const s = m[1];
+                if (s === '十') return 10;
+                if (s.length === 2 && s[0] === '十') return 10 + (cnMap[s[1]] || 0);
+                if (s.length === 2 && s[1] === '十') return (cnMap[s[0]] || 0) * 10;
+                if (s.length === 3 && s[1] === '十') return (cnMap[s[0]] || 0) * 10 + (cnMap[s[2]] || 0);
+                return cnMap[s] || 0;
+            };
+            return chapterNum(a) - chapterNum(b);
+        });
+        sorted.forEach(kp => {
+            const opt = document.createElement('option');
+            opt.value = kp.id;
+            opt.textContent = `${kp.chapter} ${kp.name}（${kp.category}）`;
+            opt.dataset.desc = kp.desc || '';
+            chapterSelect.appendChild(opt);
+        });
+        document.getElementById('chapterGroup').style.display = 'block';
+    } else {
+        document.getElementById('chapterGroup').style.display = 'none';
+    }
+});
+
+// 点击上传区域
+uploadArea.addEventListener('click', () => fileInput.click());
+
+// 拖拽事件
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+});
+
+// 文件选择
+fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+});
+
+function handleFiles(files) {
+    selectedFiles = Array.from(files).filter(file =>
+        file.type.startsWith('image/')
+    );
+
+    if (selectedFiles.length === 0) {
+        showToast('请选择图片文件', 'error');
+        return;
+    }
+
+    // 显示预览
+    previewArea.innerHTML = '';
+    previewArea.style.display = 'grid';
+
+    selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.createElement('div');
+            preview.className = 'preview-item';
+            preview.innerHTML = `
+                <img src="${e.target.result}" alt="预览">
+                <button type="button" class="remove-btn" data-index="${index}">×</button>
+            `;
+            previewArea.appendChild(preview);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    uploadBtn.disabled = false;
+}
+
+// 移除预览
+previewArea.addEventListener('click', (e) => {
+    if (e.target.classList.contains('remove-btn')) {
+        const index = parseInt(e.target.dataset.index);
+        selectedFiles.splice(index, 1);
+
+        if (selectedFiles.length === 0) {
+            previewArea.style.display = 'none';
+            uploadBtn.disabled = true;
+        } else {
+            handleFiles(selectedFiles);
+        }
+    }
+});
+
+// 表单提交
+uploadForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!gradeLevel.value) {
+        showToast('请选择年级', 'error');
+        return;
+    }
+
+    if (selectedFiles.length === 0) {
+        showToast('请选择图片', 'error');
+        return;
+    }
+
+    uploadBtn.disabled = true;
+    progressArea.style.display = 'block';
+    resultArea.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('grade_level', gradeLevel.value);
+    if (chapterSelect.value) {
+        formData.append('knowledge_point_id', chapterSelect.value);
+    }
+
+    // 添加标签ID
+    const tagIds = tagSelector ? tagSelector.getSelectedTags() : [];
+    tagIds.forEach(tagId => {
+        formData.append('tag_ids[]', tagId);
+    });
+
+    if (selectedFiles.length === 1) {
+        // 单张上传
+        formData.append('file', selectedFiles[0]);
+        await uploadSingle(formData);
+    } else {
+        // 批量上传
+        selectedFiles.forEach(file => {
+            formData.append('files[]', file);
+        });
+        await uploadBatch(formData);
+    }
+});
+
+async function uploadSingle(formData) {
+    try {
+        const response = await fetch('/classics/upload/image', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showResult(result);
+        } else {
+            showToast('上传失败: ' + (result.error || '未知错误'), 'error');
+        }
+    } catch (error) {
+        showToast('上传失败: ' + error.message, 'error');
+    } finally {
+        progressArea.style.display = 'none';
+        uploadBtn.disabled = false;
+    }
+}
+
+async function uploadBatch(formData) {
+    try {
+        const response = await fetch('/classics/upload/batch', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showBatchResult(result);
+        } else {
+            showToast('批量上传失败: ' + (result.error || '未知错误'), 'error');
+        }
+    } catch (error) {
+        showToast('批量上传失败: ' + error.message, 'error');
+    } finally {
+        progressArea.style.display = 'none';
+        uploadBtn.disabled = false;
+    }
+}
+
+function showResult(result) {
+    resultArea.style.display = 'block';
+
+    if (result.ocr_failed) {
+        // OCR识别失败，提示用户手动输入
+        resultArea.innerHTML = `
+            <div class="result-warning">
+                <h3>⚠ 图片识别失败</h3>
+                <p>${result.message || '未能识别题目文字，请尝试上传更清晰的图片'}</p>
+                <button onclick="location.reload()" class="btn btn-secondary">重新上传</button>
+            </div>
+        `;
+    } else {
+        // 识别成功
+        resultArea.innerHTML = `
+            <div class="result-success">
+                <h3>✓ 上传成功</h3>
+                <p><strong>识别的题目：</strong></p>
+                <div class="question-preview">${result.question_text || '未能识别'}</div>
+                <p><strong>知识点：</strong>${result.knowledge_point}</p>
+                <p><strong>难度：</strong>${result.difficulty}</p>
+                <a href="/classics/${result.classic_id}" class="btn btn-primary">查看详情</a>
+            </div>
+        `;
+    }
+}
+
+function showBatchResult(result) {
+    resultArea.style.display = 'block';
+    const successCount = result.succeeded;
+    const totalCount = result.total;
+
+    resultArea.innerHTML = `
+        <div class="result-success">
+            <h3>批量上传完成</h3>
+            <p>成功: ${successCount} / ${totalCount}</p>
+            <a href="/classics" class="btn btn-primary">查看经典题库</a>
+        </div>
+    `;
+}
+</script>
+{% endblock %}
