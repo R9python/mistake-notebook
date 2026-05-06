@@ -108,6 +108,68 @@
 
 {% block extra_js %}
 <script>
+// 知识点级联数据
+const kpData = {{ kp_data | tojson }};
+
+// 更新知识点下拉框
+function updateKnowledgePoints() {
+    const grade = document.getElementById('gradeFilter').value;
+    const semester = document.getElementById('semesterFilter').value;
+    const kpSelect = document.getElementById('knowledgePointFilter');
+    const currentValue = kpSelect.value;
+
+    // 清空选项，保留"全部知识点"
+    kpSelect.innerHTML = '<option value="">全部知识点</option>';
+
+    if (!grade) {
+        // 如果没有选择年级，显示所有知识点
+        {% for kp in knowledge_points %}
+        const opt{{ loop.index }} = document.createElement('option');
+        opt{{ loop.index }}.value = '{{ kp.id }}';
+        opt{{ loop.index }}.textContent = '{{ kp.name }}';
+        if ('{{ kp.id }}' === currentValue) opt{{ loop.index }}.selected = true;
+        kpSelect.appendChild(opt{{ loop.index }});
+        {% endfor %}
+        return;
+    }
+
+    // 根据年级和学期筛选知识点
+    const gradeData = kpData[grade];
+    if (!gradeData) return;
+
+    if (!semester) {
+        // 只选择了年级，显示该年级所有学期的知识点
+        for (const sem in gradeData) {
+            gradeData[sem].forEach(kp => {
+                const opt = document.createElement('option');
+                opt.value = kp.id;
+                opt.textContent = kp.name;
+                if (kp.id.toString() === currentValue) opt.selected = true;
+                kpSelect.appendChild(opt);
+            });
+        }
+    } else {
+        // 选择了年级和学期，只显示对应的知识点
+        const semesterData = gradeData[semester];
+        if (semesterData) {
+            semesterData.forEach(kp => {
+                const opt = document.createElement('option');
+                opt.value = kp.id;
+                opt.textContent = kp.name;
+                if (kp.id.toString() === currentValue) opt.selected = true;
+                kpSelect.appendChild(opt);
+            });
+        }
+    }
+}
+
+// 监听年级和学期变化
+document.getElementById('gradeFilter').addEventListener('change', updateKnowledgePoints);
+document.getElementById('semesterFilter').addEventListener('change', updateKnowledgePoints);
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', updateKnowledgePoints);
+
 function getSelectedIds() {
     const checkboxes = document.querySelectorAll('.mistake-checkbox:checked');
     return Array.from(checkboxes).map(cb => parseInt(cb.value));
