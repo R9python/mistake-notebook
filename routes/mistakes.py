@@ -17,7 +17,7 @@ def mistake_list():
     # 获取筛选参数
     grade_level = request.args.get('grade', type=int)
     semester = request.args.get('semester', type=int)
-    knowledge_point_id = request.args.get('kp', type=int)
+    knowledge_point_id = request.args.get('knowledge_point', type=int)
     tag_id = request.args.get('tag', type=int)
     is_mastered = request.args.get('mastered')
     page = request.args.get('page', 1, type=int)
@@ -71,9 +71,17 @@ def mistake_list():
     # 获取所有标签
     tags = Tag.query.order_by(Tag.name).all()
 
+    # 获取所有知识点（扁平列表，供下拉框使用）
+    knowledge_points = KnowledgePoint.query.order_by(
+        KnowledgePoint.grade_level,
+        KnowledgePoint.semester,
+        KnowledgePoint.chapter
+    ).all()
+
     return render_template('mistake_list.html',
                            mistakes=mistakes,
                            kp_data=kp_data,
+                           knowledge_points=knowledge_points,
                            tags=tags)
 
 
