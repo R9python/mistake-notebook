@@ -346,13 +346,17 @@ body {
 }
 
 .mastered-badge {
-    display: inline-block;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
     background-color: var(--ms-green);
     color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    border-radius: 12px;
     font-size: 0.75rem;
-    margin-top: 0.5rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    z-index: 2;
 }
 
 .review-count {
