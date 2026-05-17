@@ -312,9 +312,11 @@ def get_similar_questions(mistake_id):
         ai_service = AIService()
         knowledge_point_name = mistake.knowledge_point.name if mistake.knowledge_point else '未分类'
 
+        tag_names = [tag.name for tag in mistake.tags] if mistake.tags else None
         similar_questions = ai_service.recommend_similar_questions(
             mistake.question_text,
-            knowledge_point_name
+            knowledge_point_name,
+            tags=tag_names
         )
 
         # 保存推荐

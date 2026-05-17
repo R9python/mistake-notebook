@@ -411,52 +411,64 @@ $$
             logger.error(f"生成解析失败: {type(e).__name__}: {e}")
             return f"解析生成失败: {str(e)}"
 
-    def recommend_similar_questions(self, question_text: str, knowledge_point: str) -> list:
+    def recommend_similar_questions(self, question_text: str, knowledge_point: str, tags: list = None) -> list:
         """
         推荐类似题目
 
         Args:
             question_text: 原题目文字
             knowledge_point: 知识点名称
+            tags: 题目标签列表（可选）
 
         Returns:
             [
                 {
                     'question': str,  # 题目
                     'answer': str,    # 答案
-                    'hint': str       # 简要提示
+                    'hint': str       # 分步解题思路
                 },
                 ...
             ]
         """
-        prompt = f"""基于以下原题和知识点，生成3道类似的练习题：
+        tags_line = f"题目标签：{', '.join(tags)}" if tags else ""
+        prompt = f"""根据下面这道初中数学题，生成3道类似的练习题，用于帮助学生巩固同一知识点。
 
 原题：
 {question_text}
 
 知识点：{knowledge_point}
+{tags_line}
 
-要求：
-- 难度相近
-- 考查相同知识点
-- 题型略有变化（不要完全一样）
-- 每道题都要有答案和简要解题提示
+出题要求：
+- 难度与原题相近
+- 考查完全相同的知识点和解题方法
+- 标签反映了该题的题型和易错点，出题时需体现这些特征
+- 三道题各自采用不同的变化方式，例如：改变数值、改变已知/求解方向、改变题目情境
+- 不要与原题过于相似，避免学生只靠套路解题
+- 数学符号和公式使用 LaTeX 格式（行内用 $...$，块级用 $$...$$）
+- 出题前必须自行验算，确保题目有唯一正确答案且答案与解题过程完全一致，不得出现无解或条件矛盾的题目
 
-请以JSON格式返回：
+请以 JSON 格式返回，不要包含其他文字：
 [
     {{
         "question": "题目文字",
-        "answer": "答案",
-        "hint": "解题提示"
+        "answer": "最终答案",
+        "hint": "分步解题思路，帮助学生理解方法"
     }},
     ...
 ]"""
 
         try:
             response = self.client.chat.completions.create(
-                model=self.text_model,  # 使用文本模型
+                model=self.text_model,
                 max_tokens=3072,
-                messages=[{'role': 'user', 'content': prompt}]
+                messages=[
+                    {
+                        'role': 'system',
+                        'content': '你是一位经验丰富的初中数学教师，擅长出题和分析题目考查点。'
+                    },
+                    {'role': 'user', 'content': prompt}
+                ]
             )
 
             result_text = response.choices[0].message.content
